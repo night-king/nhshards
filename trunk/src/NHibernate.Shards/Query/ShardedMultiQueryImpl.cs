@@ -428,15 +428,18 @@ namespace NHibernate.Shards.Query
         private class ListShardOperation : IShardOperation<IList>
         {
             private readonly IShardedMultiQuery shardedMultiQuery;
+        	private readonly object syncLock = new object();
 
             public ListShardOperation(IShardedMultiQuery shardedMultiQuery)
             {
                 this.shardedMultiQuery = shardedMultiQuery;
             }
 
-            public IList Execute(IShard shard)
+            public Func<IList> Prepare(IShard shard)
             {
-                return this.shardedMultiQuery.EstablishFor(shard).List();
+				// NOTE: Establish action is not thread-safe and therefore must not be performed by returned delegate.
+				var multiQuery = this.shardedMultiQuery.EstablishFor(shard);
+                return multiQuery.List;
             }
 
             public string OperationName

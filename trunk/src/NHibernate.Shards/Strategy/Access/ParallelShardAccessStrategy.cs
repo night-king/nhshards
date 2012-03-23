@@ -99,6 +99,9 @@ namespace NHibernate.Shards.Strategy.Access
 				var s = (IShard)state;
 				try
 				{
+					Func<T> shardOperation;
+
+					// Perform thread-safe preparation of the operation for a single shard.
 					lock (this)
 					{
 						// Prevent execution if parallel operation has already been cancelled.
@@ -107,10 +110,14 @@ namespace NHibernate.Shards.Strategy.Access
 							if (--_activeCount <= 0) Monitor.Pulse(this);
 							return;
 						}
+
+						shardOperation = _operation.Prepare(s);
 					}
 
-					var result = _operation.Execute(s);
+					// Perform operation execution on multiple shards in parallel.
+					var result = shardOperation();
 
+					// Perform thread-safe aggregation of operation results.
 					lock (this)
 					{
 						// Only add result if operation still has not been cancelled and result is not null.
